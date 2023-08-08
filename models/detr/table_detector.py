@@ -11,6 +11,9 @@ import os
 from pytesseract import Output
 import pytesseract
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ENDPOINT_URL_1= os.getenv("ENDPOINT_URL_1")
 ENDPOINT_URL_2= os.getenv("ENDPOINT_URL_2")
@@ -21,24 +24,29 @@ from operator import itemgetter
 # {'error': 'The size of tensor a (685) must match the size of tensor b (512) at non-singleton dimension 1'}
 
 
-def detect_table(path_to_image:str=None):
-	with open(path_to_image, "rb") as i:
-		b = i.read()
+def detect_table(image: Image.Image):
+	byte_stream = io.BytesIO()
+	image.save(byte_stream, format='JPEG')
+	byte_stream.seek(0) 
+	image_data = byte_stream.read()
+
 	headers= {
 		"Authorization": f"Bearer {HF_TOKEN}",
-		"Content-Type": mimetypes.guess_type(path_to_image)[0]
+        "Content-Type": "image/jpeg"
 	}
-	response = r.post(ENDPOINT_URL_2, headers=headers, data=b)
+	response = r.post(ENDPOINT_URL_2, headers=headers, data=image_data)
 	return response.json()
 
-def extract_table(path_to_image:str=None):
-	with open(path_to_image, "rb") as i:
-		b = i.read()
+def extract_table(image: Image.Image):
+	byte_stream = io.BytesIO()
+	image.save(byte_stream, format='JPEG')
+	byte_stream.seek(0) 
+	image_data = byte_stream.read()
 	headers= {
 		"Authorization": f"Bearer {HF_TOKEN}",
-		"Content-Type": mimetypes.guess_type(path_to_image)[0]
+        "Content-Type": "image/jpeg"
 	}
-	response = r.post(ENDPOINT_URL_1, headers=headers, data=b)
+	response = r.post(ENDPOINT_URL_1, headers=headers, data=image_data)
 	return response.json()
 
 def ocr(image_array):
@@ -114,9 +122,9 @@ def ocr_aws(image_array):
 		ocr_text = ocr_text.replace('\n', '')
 	return ocr_text
 
-def draw_table(prediction, path_to_image):
+def draw_table(prediction, image: Image.Image):
 	# Load the image
-	image = cv2.imread(path_to_image)
+	image = np.array(image)
 
 	# Define color for the table box (in BGR)
 	color = (0, 165, 255)  # Orange
@@ -143,9 +151,9 @@ def draw_table(prediction, path_to_image):
 	plt.show()
 	
 	
-def crop_table(prediction, path_to_image, padding= 100):
+def crop_table(prediction, image: Image.Image, padding= 100) -> Image.Image:
 	# Load the image
-	image = cv2.imread(path_to_image)
+	image = np.array(image)
 
 	# Get box coordinates of the first detected table
 	box = prediction[0]['box']
@@ -160,31 +168,24 @@ def crop_table(prediction, path_to_image, padding= 100):
 	# Crop the image
 	cropped_image = image[ymin:ymax, xmin:xmax]
 
+	#convet to PIL image
+	cropped_image = Image.fromarray(cropped_image)
+
 	# Save the cropped image
-	filepath, filename = os.path.split(path_to_image)
-  
-	# Construct cropped filename
-	cropped_filename = "cropped_" + filename
-	
-	# Construct full cropped path
-	cropped_path = os.path.join(filepath, cropped_filename)
+	return cropped_image
 
-	cv2.imwrite(cropped_path, cropped_image)
-	
-	return cropped_path
+def draw_rows(prediction, image: Image.Image):
+	draw_boxes(prediction, image, only='table row')
 
-def draw_rows(prediction, path_to_image):
-	draw_boxes(prediction, path_to_image, only='table row')
+def draw_columns(prediction, image: Image.Image):
+	draw_boxes(prediction, image, only='table column')
 
-def draw_columns(prediction, path_to_image):
-	draw_boxes(prediction, path_to_image, only='table column')
+def draw_boxes_only(prediction, image: Image.Image):
+	draw_boxes(prediction, image, only='box')
 
-def draw_boxes_only(prediction, path_to_image):
-	draw_boxes(prediction, path_to_image, only='box')
-
-def draw_boxes(prediction, path_to_image, only=None):
+def draw_boxes(prediction, image: Image.Image, only=None):
 	# Load the image
-	image = cv2.imread(path_to_image)
+	image = np.array(image)
 
 	# Define colors for different box types (in BGR)
 	colors = {
@@ -226,9 +227,9 @@ def intersect(row, column):
 			'ymax': min(row['ymax'], column['ymax'])}
 
 
-def draw_cells(prediction, path_to_image):
+def draw_cells(prediction, image: Image.Image):
 	# Load the image
-	image = cv2.imread(path_to_image)
+	image = np.array(image)
 
 	# Separate rows and columns from prediction
 	rows = [item for item in prediction if item['label'] == 'table row']
@@ -275,10 +276,11 @@ def draw_cells(prediction, path_to_image):
 	return cells
 
 
-def extract_table_from_predictions(predictions, image_path):
+def extract_table_from_predictions(predictions, image: Image.Image):
 
 	# Load the image
-	img = cv2.imread(image_path)
+	image = np.array(image)
+
 
 	# Separate rows and columns from prediction
 	rows = sorted([item for item in predictions if item['label'] == 'table row'], key=lambda x: x['box']['ymin'])
@@ -299,10 +301,12 @@ def extract_table_from_predictions(predictions, image_path):
 
 			# Crop cell from image
 			xmin, ymin, xmax, ymax = cell['xmin'], cell['ymin'], cell['xmax'], cell['ymax']
-			cropped_cell = img[ymin:ymax, xmin:xmax]
+			cropped_cell = image[ymin:ymax, xmin:xmax]
 
 			# Extract cell content
-			cell_content = only_ocr_image(cropped_cell)
+			cropped_image = Image.fromarray(cropped_cell)
+
+			cell_content = only_ocr_image(cropped_image)
 			# cell_content = cell_content["predictions"]
 			cell_content = cell_content.replace('\n', ' ')
 
@@ -318,20 +322,29 @@ def extract_table_from_predictions(predictions, image_path):
 	return df
 
 
+def table_pipeline(image: Image.Image, idx):
+
+	prediction = detect_table(image)
+	print(f"For table {idx}: {prediction}")
+	if len(prediction) != 0:
+		draw_table(prediction, image)
+
+		# Crop the table from the image
+		cropped_image = crop_table(prediction, image)
+
+		prediction = extract_table(cropped_image)
+		print(prediction)
+		#draw_columns(prediction, cropped_path)
+		cells = draw_cells(prediction, cropped_image)
+		df = extract_table_from_predictions(prediction, cropped_image)
+		print(df.to_string())
+
+
 if __name__ == '__main__':
-	prediction = detect_table(path_to_image="../images_testing/maybe_table.jpeg")
-	print(prediction)
-	draw_table(prediction, "../images_testing/maybe_table.jpeg")
+	image_path = "/Users/jonahkaye/Desktop/startuping/grays-ai/layout_experimentation/images_testing/ayelet_table.jpeg"
+	image = Image.open(image_path)
+	table_pipeline(image, 1)
 
-	# Crop the table from the image
-	cropped_path = crop_table(prediction, "../images_testing/maybe_table.jpg")
-
-	prediction = extract_table(path_to_image=cropped_path)
-	print(prediction)
-	#draw_columns(prediction, cropped_path)
-	cells = draw_cells(prediction, cropped_path)
-	df = extract_table_from_predictions(prediction, cropped_path)
-	print(df.to_string())
 
 
 
