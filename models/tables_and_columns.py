@@ -16,11 +16,15 @@ from collections import Counter
 from warnings import simplefilter
 simplefilter(action='ignore', category=UserWarning)
 
-def ShowBoundingBox(draw,box,width,height,boxColor):
+from .table_extraction import get_table_csv_results
+from .image_rotation import rotation_pipeline
+
+def ShowBoundingBox(draw,box,width,height,boxColor, lineThickness=10):
 			 
 	left = width * box['Left']
-	top = height * box['Top'] 
-	draw.rectangle([left,top, left + (width * box['Width']), top +(height * box['Height'])],outline=boxColor)   
+	top = height * box['Top']
+	draw.rectangle([left,top, left + (width * box['Width']), top +(height * box['Height'])],outline=boxColor, width=lineThickness
+)   
 
 def ShowSelectedElement(draw,box,width,height,boxColor):
 			 
@@ -28,7 +32,7 @@ def ShowSelectedElement(draw,box,width,height,boxColor):
 	top = height * box['Top'] 
 	draw.rectangle([left,top, left + (width * box['Width']), top +(height * box['Height'])],fill=boxColor)  
 
-def process_text_analysis(client, image):
+def aws_get_lines(client, image):
 
 	# Convert PDF to image
 
@@ -38,11 +42,23 @@ def process_text_analysis(client, image):
 		image_bytes = output.getvalue()
 		
 	#detect_document_text
-	response = client.detect_document_text(Document={'Bytes': image_bytes}) #, FeatureTypes=["TABLES"])
-	return response['Blocks'], image
+	response = client.detect_document_text(Document={'Bytes': image_bytes})
+	return response['Blocks']
+
+def aws_extract_tables(client, image):
+
+	# Convert PDF to image
+
+	# Convert the image to bytes
+	with io.BytesIO() as output:
+		image.save(output, format="JPEG")
+		image_bytes = output.getvalue()
+		
+	#detect_document_text
+	response = client.analyze_document(Document={'Bytes': image_bytes}, FeatureTypes=["TABLES"])
+	return response['Blocks']
 
 #########################
-
 
 def find_columns(peaks, line_boxes, threshold=0.02):
 
@@ -61,6 +77,7 @@ def find_columns(peaks, line_boxes, threshold=0.02):
 	"""
 	columns = []
 	boxes_inside_columns_set = set()  # A set to keep track of box IDs already in columns
+	columns_text = ""
 
 	for idx, peak in enumerate(peaks):
 		# 1. Initialize values
@@ -101,17 +118,16 @@ def find_columns(peaks, line_boxes, threshold=0.02):
 
 		boxes_inside_columns_set.update(current_box_ids)
 		
-		detected_text = ' '.join([box['Text'] for box in current_boxes])
+		detected_text = ' '.join([box.get('Text', '') for box in current_boxes])
 
 		# 4. Create the bounding box (column box)
 		column_box = {
 			"Id": peak, # we might want to give this some ID
-			"Detected": detected_text,
-			"Type": "COLUMN",
-			"Confidence": None, # average or use some other metric?
-			"Relationships": None, # we can add more detailed relationship info if required
+			"Text": detected_text,
+			"BlockType": "COLUMN",
+			"Confidence": 0.0, # average or use some other metric?
 			"Geometry": {
-				"Bounding Box": {
+				"BoundingBox": {
 					'Width': rightmost_box['Geometry']['Polygon'][2]['X'] - leftmost_box['Geometry']['Polygon'][0]['X'],
 					'Height': ending_box['Geometry']['Polygon'][3]['Y'] - starting_box['Geometry']['Polygon'][0]['Y'],
 					'Left': leftmost_box['Geometry']['Polygon'][0]['X'],
@@ -126,17 +142,18 @@ def find_columns(peaks, line_boxes, threshold=0.02):
 			}
 		}
 		columns.append(column_box)
+		columns_text += detected_text + "\n\n"
 
 	# the set of boxes that are not in columns. O(n) lookup
 	remaining_boxes = [box for box in line_boxes if box['Id'] not in boxes_inside_columns_set]
-	remaining_text = ' '.join([box['Text'] for box in remaining_boxes])
 	print(f"remaining_boxes: {len(remaining_boxes)}")
 	print(f"overall boxes: {len(line_boxes)}")
-	print(f"remaining_text: {remaining_text}")
-	return columns, remaining_boxes
+
+	remaining_text = ' '.join([box.get('Text', '') for box in remaining_boxes])
+	return columns, remaining_boxes, remaining_text, columns_text
 
 
-def find_column_peaks(hist, bin_edges, number_of_lines, distance=10):
+def find_column_peaks_and_draw_lines(line_boxes, number_of_lines, draw, width, height, distance=10, bin_width=0.01):
 	"""
 	Identify the peaks in the histogram using a simple distance threshold. 
 
@@ -150,6 +167,13 @@ def find_column_peaks(hist, bin_edges, number_of_lines, distance=10):
 	- column_ranges (list of tuples): Each tuple corresponds to the range (start, end) of a column's x-values.
 	"""
 
+	x_starts = []
+	for box in line_boxes:
+		x_starts.append(box['Geometry']['Polygon'][0]['X'])
+		ShowBoundingBox(draw, box['Geometry']['BoundingBox'], width, height, 'orange')
+
+	# Create histogram
+	hist, bin_edges = np.histogram(x_starts, bins=np.arange(0, 1 + bin_width, bin_width))
 	# Identify peaks in the histogram
 	height = round(number_of_lines / 10)
 	peaks, _ = find_peaks(hist, distance=distance, height=height)
@@ -158,36 +182,8 @@ def find_column_peaks(hist, bin_edges, number_of_lines, distance=10):
 
 	return x_peaks
 
-def generate_histogram(y_table, bin_width=0.01):
-	"""
-	Generates a histogram for the most common starting x-values.
 
-	Parameters:
-	- y_table (dict): Dictionary containing y averages as keys and their associated bounding boxes as values.
-	- bin_width (float): The width of each bin, determining how "fuzzy" the histogram is.
-
-	Returns:
-	- hist (array): Values of the histogram.
-	- bin_edges (array): The bin edges.
-	"""
-
-	# Extracting x_starts from y_table
-	x_starts = []
-	for _, boxes in y_table.items():
-		for box in boxes:
-			x_starts.append(box[0]['X'])
-
-	# Create histogram
-	hist, bin_edges = np.histogram(x_starts, bins=np.arange(0, 1 + bin_width, bin_width))
-
-	# Plotting the histogram
-	# plt.bar(bin_edges[:-1], hist, width=bin_width)
-	# plt.xlabel('Starting x-value')
-	# plt.ylabel('Count')
-	# plt.title('Histogram of starting x-values')
-	# plt.show()
-
-	return hist, bin_edges
+############
 
 def calculate_avg_y(line):
 	"""
@@ -197,10 +193,12 @@ def calculate_avg_y(line):
 	# round to the nearest 100th
 	return round(sum(y_values) / len(y_values), 2)
 
-def has_column_structure(lines, idx):
+def has_column_table_structure(lines, idx, threshold=0.75):
 	"""
 	Determines if more than 75% of the lines on a given page are on the same line 
 	as at least one other line by averaging Y coordinates and rounding to the nearest hundredth.
+
+	Or if any single line has more than 6 lines on that line. 
 	"""
 	y_table = {}
 
@@ -212,43 +210,88 @@ def has_column_structure(lines, idx):
 		else:
 			y_table[avg_y] = [bbox]
 
-	same_line_count = sum(len(entries) for key, entries in y_table.items() if len(entries) > 1)
+	same_line_count = 0
+	has_greater_than_six = False
+
+	for entries in y_table.values():
+		if len(entries) > 1:
+			same_line_count += len(entries)
+		if len(entries) > 6:
+			has_greater_than_six = True
+			break
 	
 	print(f"For page {idx}, same_line_count: {same_line_count}, len(lines): {len(lines)}")
 	#print(f"y_table: {y_table}")
-	is_column = same_line_count / len(lines) > 0.75
-	return is_column, y_table, len(lines)
+	if len(lines) == 0:
+		return False, 0
+	
+	is_column = (same_line_count / len(lines) > threshold) or has_greater_than_six
+	return is_column, len(lines)
 
-def show_blocks(blocks, image, idx):
-	width, height =image.size    
+############
+
+def column_extraction(line_boxes, draw, width, height, number_of_lines, idx):
+	print(f"Page {idx}: Column extraction")
+	peaks = find_column_peaks_and_draw_lines(line_boxes, number_of_lines, draw, width, height)
+	columns, remaining_boxes, remaining_text, detected_text= find_columns(peaks, line_boxes)
+	for column in columns:
+		ShowBoundingBox(draw, column['Geometry']['BoundingBox'], width, height, 'red')
+
+	return columns, remaining_boxes, remaining_text, detected_text
+
+def table_extraction(draw, width, height, client, image, idx) -> (str, bool, list):
+	print(f"Page {idx}: Table extraction")
+	blocks = aws_extract_tables(client, image)
+
+	return get_table_csv_results(blocks, draw, width, height)
+
+
+def regular_extraction(line_boxes, draw, width, height, idx):
+	for box in line_boxes:
+		ShowBoundingBox(draw, box['Geometry']['BoundingBox'], width, height, 'yellow')
+	print(f"Page {idx}: Regular extraction")
+
+
+
+def show_and_extract_blocks(client, image, idx):
+
+	blocks = aws_get_lines(client, image)
+	#checks if image is rotated and if so, rotates it 90 degrees
+	image, rotated = rotation_pipeline(image, blocks)
+	if rotated:
+		# call get lines again on the new image
+		blocks = aws_get_lines(client, image)
+	width, height =image.size   
+	# Get the text block 
    
 	line_boxes = []  # Initialize outside the loop
+	table_boxes = []
 	draw=ImageDraw.Draw(image)
 
 	# Create image showing bounding box/polygon the detected lines/text
 	for block in blocks:
-
-		# Draw bounding boxes for different detected response objects
-		if block['BlockType'] == "PAGE":
-			print("NEW PAGE")            
-		if block['BlockType'] == 'TABLE':
-			ShowBoundingBox(draw, block['Geometry']['BoundingBox'],width,height, 'blue')
-		if block['BlockType'] == 'CELL':
-			ShowBoundingBox(draw, block['Geometry']['BoundingBox'],width,height, 'green')
 		if block['BlockType'] == 'LINE':
-			ShowBoundingBox(draw, block['Geometry']['BoundingBox'],width,height, 'orange')
 			line_boxes.append(block)
-		if block['BlockType'] == 'SELECTION_ELEMENT':
-			if block['SelectionStatus'] =='SELECTED':
-				ShowSelectedElement(draw, block['Geometry']['BoundingBox'],width,height, 'blue')
-			
-	is_column, y_table, number_of_lines = has_column_structure(line_boxes, idx)
-	if is_column:
-		hist, bin_edges = generate_histogram(y_table)
-		peaks = find_column_peaks(hist, bin_edges, number_of_lines)
-		columns = find_columns(peaks, line_boxes)
-		for column in columns:
-			ShowBoundingBox(draw, column['Geometry']['Bounding Box'], width, height, 'red')
+
+	is_col_table, number_of_lines = has_column_table_structure(line_boxes, idx, threshold=0.65)
+	if is_col_table:
+		tables_string, was_tables_found, lines_boxes_no_table = table_extraction(draw, width, height, client, image, idx)
+		if was_tables_found:
+			is_col, number_of_lines_no_table = has_column_table_structure(lines_boxes_no_table, idx, threshold=0.65)
+			if is_col:
+				columns, remaining_boxes, remaining_text, column_text = column_extraction(lines_boxes_no_table, draw, width, height, number_of_lines_no_table, idx)
+				print("REMAINING TEXT:", remaining_text)
+				print("DETECTED TEXT:", column_text)
+			else:
+				regular_extraction(lines_boxes_no_table, draw, width, height, idx)
+			print("TABLE TEXT:", tables_string)
+		else:
+			# extract according to the original structure that was found. 
+			columns, remaining_boxes, remaining_text, column_text = column_extraction(lines_boxes_no_table, draw, width, height, number_of_lines, idx)
+			print("REMAINING TEXT:", remaining_text)
+			print("DETECTED TEXT:", column_text)
+	else:
+		regular_extraction(line_boxes, draw, width, height, idx)
 
 	return image
 
@@ -257,17 +300,17 @@ def main():
 
 	session = boto3.Session(profile_name='jonahkaye')
 	client = session.client('textract', region_name='us-east-1')
-	document = "/Users/jonahkaye/Desktop/startuping/grays-ai/eyenamics/xxxx.pdf"
+	document = "/Users/jonahkaye/Desktop/startuping/grays-ai/Fertility_Clinic/sana.pdf"
 	images = convert_from_path(document)
 	modified_images = []  # List to store modified images
+	
 
 	for idx, image in enumerate(images):
-		blocks, image = process_text_analysis(client, image)
-		modified_image = show_blocks(blocks, image, idx)
+		modified_image = show_and_extract_blocks(client, image, idx)
 		modified_images.append(modified_image)
 
 
-	modified_images[0].save("/Users/jonahkaye/Desktop/startuping/grays-ai/eyenamics/xxxxK.pdf", "PDF", resolution=100.0, save_all=True, append_images=modified_images[1:])
+	modified_images[0].save("/Users/jonahkaye/Desktop/startuping/grays-ai/Fertility_Clinic/sana2k.pdf", "PDF", resolution=100.0, save_all=True, append_images=modified_images[1:])
 
 
 # Displays information about a block returned by text detection and text analysis
@@ -308,86 +351,6 @@ def DisplayBlockInformation(block):
 		print('Page: ' + block['Page'])
 	print()
 
-def best_cluster_count(y_table):
-	"""
-	Determines the best cluster count for x-start values.
 
-	Parameters:
-	- y_table (dict): Dictionary containing y averages as keys and their associated bounding boxes as values.
-
-	Returns:
-	- best_k (int): The optimal number of clusters.
-	- best_score (float): Silhouette score of the best clustering.
-	- best_labels (list): Cluster labels for the best clustering.
-	"""
-	# Extracting x_starts from y_table
-	x_starts = []
-	boxes = []
-
-	for _, boxes in y_table.items():
-		for box in boxes:
-			x_starts.append(box[0]['X'])
-			boxes.append(box)
-
-
-	# Find two most frequent counts, excluding lines with just one value
-	line_counts = Counter([len(lines) for lines in y_table.values() if len(lines) > 1])
-	most_common_counts = [item[0] for item in line_counts.most_common(2)]
-	print(f"most_common_counts: {most_common_counts}")
-
-	# Cluster and evaluate for both counts
-	best_score = -1  # Silhouette scores range from -1 to 1
-	best_k = None
-	best_labels = None
-
-	for k in most_common_counts:
-		kmeans = KMeans(n_clusters=k)
-		labels = kmeans.fit_predict(np.array(x_starts).reshape(-1, 1))
-		score = silhouette_score(np.array(x_starts).reshape(-1, 1), labels)
-		print(f"for k = {k}, score = {score}")
-		
-		if score > best_score:
-			best_score = score
-			best_k = k
-			best_labels = labels
-
-	return best_k, best_score, best_labels, boxes
-
-
-def column_bounding_boxes(labels, boxes):
-	"""
-	Given a list of cluster labels and boxes, compute the bounding box for each cluster.
-
-	Parameters:
-	- labels (list): Cluster labels for each bounding box.
-	- boxes (list): List of bounding boxes.
-
-	Returns:
-	- List of bounding boxes, one for each cluster.
-	"""
-	# Dictionary to hold bounding box data for each cluster
-	clusters = {}
-	for label, box in zip(labels, boxes):
-		if label not in clusters:
-			clusters[label] = {'min_left': box['Left'],
-							   'max_right': box['Left'] + box['Width'],
-							   'min_top': box['Top'],
-							   'max_bottom': box['Top'] + box['Height']}
-		else:
-			clusters[label]['min_left'] = min(clusters[label]['min_left'], box['Left'])
-			clusters[label]['max_right'] = max(clusters[label]['max_right'], box['Left'] + box['Width'])
-			clusters[label]['min_top'] = min(clusters[label]['min_top'], box['Top'])
-			clusters[label]['max_bottom'] = max(clusters[label]['max_bottom'], box['Top'] + box['Height'])
-
-	# Convert data to list of bounding boxes
-	column_boxes = []
-	for _, vals in clusters.items():
-		column_boxes.append({'Left': vals['min_left'],
-							 'Top': vals['min_top'],
-							 'Width': vals['max_right'] - vals['min_left'],
-							 'Height': vals['max_bottom'] - vals['min_top']})
-
-	return column_boxes
-	
 if __name__ == "__main__":
 	main()
