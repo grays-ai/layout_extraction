@@ -1,0 +1,103 @@
+[09/07 09:21:41] detectron2 INFO: Rank of current process: 2. World size: 8
+[09/07 09:21:42] detectron2 INFO: Environment info:
+-------------------------------  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+sys.platform                     darwin
+Python                           3.9.16 (main, May 23 2023, 14:21:54) [Clang 14.0.0 (clang-1400.0.29.102)]
+numpy                            1.24.3
+detectron2                       0.6 @/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/detectron2
+detectron2._C                    not built correctly: dlopen(/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/detectron2/_C.cpython-39-darwin.so, 0x0002): Symbol not found: (__ZN2at4_ops10select_int4callERKNS_6TensorExN3c106SymIntE)
+                                   Referenced from: '/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/detectron2/_C.cpython-39-darwin.so'
+                                   Expected in: '/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/torch/lib/libtorch_cpu.dylib'
+Compiler ($CXX)                  Apple clang version 14.0.0 (clang-1400.0.29.102)
+DETECTRON2_ENV_MODULE            <not set>
+PyTorch                          1.9.0 @/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/torch
+PyTorch debug build              False
+torch._C._GLIBCXX_USE_CXX11_ABI  False
+GPU available                    No: torch.cuda.is_available() == False
+Pillow                           9.3.0
+torchvision                      0.10.0 @/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/torchvision
+fvcore                           0.1.5.post20221221
+iopath                           0.1.9
+cv2                              4.7.0
+-------------------------------  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+PyTorch built with:
+  - GCC 4.2
+  - C++ Version: 201402
+  - clang 12.0.0
+  - CPU capability usage: NO AVX
+  - Build settings: BLAS_INFO=accelerate, BUILD_TYPE=Release, CXX_COMPILER=/Applications/Xcode-12.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++, CXX_FLAGS= -Wno-deprecated -fvisibility-inlines-hidden -Wno-deprecated-declarations -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -Wno-narrowing -Wall -Wextra -Werror=return-type -Wno-missing-field-initializers -Wno-type-limits -Wno-array-bounds -Wno-unknown-pragmas -Wno-sign-compare -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -Wno-unused-result -Wno-unused-local-typedefs -Wno-strict-overflow -Wno-strict-aliasing -Wno-error=deprecated-declarations -Wno-error=pedantic -Wno-error=redundant-decls -Wno-error=old-style-cast -Wno-invalid-partial-specialization -Wno-typedef-redefinition -Wno-unknown-warning-option -Wno-unused-private-field -Wno-inconsistent-missing-override -Wno-aligned-allocation-unavailable -Wno-c++14-extensions -Wno-constexpr-not-const -Wno-missing-braces -Qunused-arguments -fcolor-diagnostics -fno-math-errno -fno-trapping-math -Werror=format -Werror=cast-function-type -Wno-unused-private-field -Wno-missing-braces -Wno-c++14-extensions -Wno-constexpr-not-const, LAPACK_INFO=accelerate, TORCH_VERSION=1.9.0, USE_CUDA=OFF, USE_CUDNN=OFF, USE_EIGEN_FOR_BLAS=ON, USE_EXCEPTION_PTR=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_MKL=OFF, USE_MKLDNN=OFF, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=OFF, USE_OPENMP=OFF, 
+
+[09/07 09:21:42] detectron2 INFO: Command line arguments: Namespace(config_file='object_detection/publaynet_configs/cascade/cascade_dit_base.yaml', resume=False, eval_only=False, num_gpus=8, num_machines=1, machine_rank=0, dist_url='tcp://127.0.0.1:49653', opts=['MODEL.WEIGHTS', './object_detection/publaynet_dit-b_cascade.pth', 'OUTPUT_DIR', './logs'], debug=False)
+[09/07 09:21:42] detectron2 INFO: Contents of args.config_file=object_detection/publaynet_configs/cascade/cascade_dit_base.yaml:
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  PIXEL_MEAN: [ 127.5, 127.5, 127.5 ]
+  PIXEL_STD: [ 127.5, 127.5, 127.5 ]
+  WEIGHTS: "https://layoutlm.blob.core.windows.net/dit/dit-pts/dit-base-224-p16-500k-62d53a.pth"
+  VIT:
+    NAME: "dit_base_patch16"
+  ROI_HEADS:
+    NAME: CascadeROIHeads
+  ROI_BOX_HEAD:
+    CLS_AGNOSTIC_BBOX_REG: True
+  RPN:
+    POST_NMS_TOPK_TRAIN: 2000
+SOLVER:
+  WARMUP_ITERS: 1000
+  IMS_PER_BATCH: 16
+  MAX_ITER: 60000
+  CHECKPOINT_PERIOD: 2000
+TEST:
+  EVAL_PERIOD: 2000
+
+[09/07 09:26:04] detectron2 INFO: Rank of current process: 2. World size: 8
+[09/07 09:26:05] detectron2 INFO: Environment info:
+-------------------------------  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+sys.platform                     darwin
+Python                           3.9.16 (main, May 23 2023, 14:21:54) [Clang 14.0.0 (clang-1400.0.29.102)]
+numpy                            1.24.3
+detectron2                       0.6 @/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/detectron2
+detectron2._C                    not built correctly: dlopen(/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/detectron2/_C.cpython-39-darwin.so, 0x0002): Symbol not found: (__ZN2at4_ops10select_int4callERKNS_6TensorExN3c106SymIntE)
+                                   Referenced from: '/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/detectron2/_C.cpython-39-darwin.so'
+                                   Expected in: '/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/torch/lib/libtorch_cpu.dylib'
+Compiler ($CXX)                  Apple clang version 14.0.0 (clang-1400.0.29.102)
+DETECTRON2_ENV_MODULE            <not set>
+PyTorch                          1.9.0 @/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/torch
+PyTorch debug build              False
+torch._C._GLIBCXX_USE_CXX11_ABI  False
+GPU available                    No: torch.cuda.is_available() == False
+Pillow                           9.3.0
+torchvision                      0.10.0 @/Users/jonahkaye/.pyenv/versions/3.9.16/lib/python3.9/site-packages/torchvision
+fvcore                           0.1.5.post20221221
+iopath                           0.1.9
+cv2                              4.7.0
+-------------------------------  --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+PyTorch built with:
+  - GCC 4.2
+  - C++ Version: 201402
+  - clang 12.0.0
+  - CPU capability usage: NO AVX
+  - Build settings: BLAS_INFO=accelerate, BUILD_TYPE=Release, CXX_COMPILER=/Applications/Xcode-12.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++, CXX_FLAGS= -Wno-deprecated -fvisibility-inlines-hidden -Wno-deprecated-declarations -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -Wno-narrowing -Wall -Wextra -Werror=return-type -Wno-missing-field-initializers -Wno-type-limits -Wno-array-bounds -Wno-unknown-pragmas -Wno-sign-compare -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -Wno-unused-result -Wno-unused-local-typedefs -Wno-strict-overflow -Wno-strict-aliasing -Wno-error=deprecated-declarations -Wno-error=pedantic -Wno-error=redundant-decls -Wno-error=old-style-cast -Wno-invalid-partial-specialization -Wno-typedef-redefinition -Wno-unknown-warning-option -Wno-unused-private-field -Wno-inconsistent-missing-override -Wno-aligned-allocation-unavailable -Wno-c++14-extensions -Wno-constexpr-not-const -Wno-missing-braces -Qunused-arguments -fcolor-diagnostics -fno-math-errno -fno-trapping-math -Werror=format -Werror=cast-function-type -Wno-unused-private-field -Wno-missing-braces -Wno-c++14-extensions -Wno-constexpr-not-const, LAPACK_INFO=accelerate, TORCH_VERSION=1.9.0, USE_CUDA=OFF, USE_CUDNN=OFF, USE_EIGEN_FOR_BLAS=ON, USE_EXCEPTION_PTR=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_MKL=OFF, USE_MKLDNN=OFF, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=OFF, USE_OPENMP=OFF, 
+
+[09/07 09:26:05] detectron2 INFO: Command line arguments: Namespace(config_file='object_detection/icdar19_configs/maskrcnn/maskrcnn_dit_large.yaml', resume=False, eval_only=False, num_gpus=8, num_machines=1, machine_rank=0, dist_url='tcp://127.0.0.1:49653', opts=['MODEL.WEIGHTS', './object_detection/publaynet_dit-b_mrcnn.pth', 'OUTPUT_DIR', './logs'], debug=False)
+[09/07 09:26:05] detectron2 INFO: Contents of args.config_file=object_detection/icdar19_configs/maskrcnn/maskrcnn_dit_large.yaml:
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  PIXEL_MEAN: [ 127.5, 127.5, 127.5 ]
+  PIXEL_STD: [ 127.5, 127.5, 127.5 ]
+  WEIGHTS: "https://layoutlm.blob.core.windows.net/dit/dit-pts/dit-large-224-p16-500k-d7a2fb.pth"
+  VIT:
+    NAME: "dit_large_patch16"
+    OUT_FEATURES: [ "layer7", "layer11", "layer15", "layer23" ]
+    DROP_PATH: 0.2
+  FPN:
+    IN_FEATURES: [ "layer7", "layer11", "layer15", "layer23" ]
+SOLVER:
+  WARMUP_ITERS: 1000
+  IMS_PER_BATCH: 16
+  MAX_ITER: 60000
+  CHECKPOINT_PERIOD: 1000
+  BASE_LR: 0.00005
+TEST:
+  EVAL_PERIOD: 1000
+

@@ -56,12 +56,12 @@ def main(args):
     """
     register publaynet first
     """
-    register_coco_instances(
-        "publaynet_train",
-        {},
-        "./publaynet_data/train.json",
-        "./publaynet_data/train"
-    )
+    # register_coco_instances(
+    #     "publaynet_train",
+    #     {},
+    #     "./publaynet_data/train.json",
+    #     "./publaynet_data/train"
+    # )
 
     register_coco_instances(
         "publaynet_val",
@@ -86,17 +86,17 @@ def main(args):
 
     cfg = setup(args)
 
-    if args.eval_only:
-        model = MyTrainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
-            cfg.MODEL.WEIGHTS, resume=args.resume
-        )
-        res = MyTrainer.test(cfg, model)
-        return res
+    # if args.eval_only:
+    #     model = MyTrainer.build_model(cfg)
+    #     DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
+    #         cfg.MODEL.WEIGHTS, resume=args.resume
+    #     )
+    #     res = MyTrainer.test(cfg, model)
+    #     return res
 
-    trainer = MyTrainer(cfg)
-    trainer.resume_or_load(resume=args.resume)
-    return trainer.train()
+    # trainer = MyTrainer(cfg)
+    # trainer.resume_or_load(resume=args.resume)
+    # return trainer.train()
 
 
 if __name__ == "__main__":
