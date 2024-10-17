@@ -1,7 +1,7 @@
 # timm==0.4.12
 git+https://github.com/rwightman/pytorch-image-models.git
 taming-transformers-rom1504
-deepspeed==0.4.0
+deepspeed==0.15.1
 Pillow
 numpy
 requests
